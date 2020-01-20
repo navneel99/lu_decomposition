@@ -7,11 +7,11 @@ using namespace std;
 typedef vector<double> ROW;
 typedef vector<ROW> MATRIX;
 
-#define NUM_THREADS 2
+#define NUM_THREADS 4
 
 
 MATRIX a;
-
+pthread_mutex_t mlock;
 
 void print_vector(vector<vector<double> > v){
     int n = v.size();
@@ -26,13 +26,19 @@ void print_vector(vector<vector<double> > v){
 
 void* generateRandom(void* vn){
     int n = (int) vn;
+    MATRIX m;
+
     for (int i = 0; i < n/NUM_THREADS; i++){
         ROW r;
         for(int j = 0; j<n;j++){
             r.push_back(1 + (drand48() * 100) );
         }
-        a.push_back(r);
+        m.push_back(r);
+        // a.push_back(r);
     }
+    pthread_mutex_lock(&mlock);
+    a.insert(a.end(),m.begin(),m.end());
+    pthread_mutex_unlock(&mlock);
 
 }
 
@@ -70,17 +76,19 @@ void* generateRandom(void* vn){
 
 
 int main(){
-    int n = 10;
+    int n = 5;
     pthread_t threads[NUM_THREADS];
+
+    pthread_mutex_init(&mlock,NULL);
+
     for ( int i = 0; i < NUM_THREADS; i++){
-        int ti = pthread_create(&threads[i],NULL,generateRandom,(void *)n);  
-        // generateRandom(n);
+        int ti = pthread_create(&threads[i],NULL,generateRandom,(void *)n); 
     }
 
     for(int i =0; i< NUM_THREADS;i++){
-        void * d;
-        int a = pthread_join(threads[i],&d);
+        int a = pthread_join(threads[i],NULL);
     }
+
     print_vector(a);
     return 0;
 
