@@ -12,7 +12,7 @@ struct arguments{
     int a2;
 };
 
-#define NUM_THREADS 4
+#define NUM_THREADS 8
 
 MATRIX a,l,u;
 pthread_mutex_t mlock;
@@ -123,40 +123,40 @@ void* firstSwap(void* r){
     int st = k + (q*(n-k)/NUM_THREADS);
     int end = k+ (q+1)*(n-k)/NUM_THREADS;
     // cout<<"st: "<<st<<" end: "<<end<<": "<<k<<" "<<q<<" "<<n<<" "<<endl;
-    // pthread_mutex_lock(&mlock);
-    // print_vector(l);
-    // pthread_mutex_unlock(&mlock);
 
     for (int i =st; i<end; i++){
         l[i][k] = a[i][k]/float(u[k][k]);
         u[k][i] = a[k][i];
     }
     if (q == NUM_THREADS- 1){
-        // pthread_mutex_lock(&mlock);
         for(int i  = end; i <n;i++){
             l[i][k] = a[i][k]/float(u[k][k]);
             u[k][i] = a[k][i];
         }
-        // pthread_mutex_unlock(&mlock);
     }
-    // pthread_mutex_lock(&mlock);
-    // print_vector(l);
-    // pthread_mutex_unlock(&mlock);
     pthread_exit(NULL);
     return NULL;
 }
 
 void* secSwap(void* r){
-    //{q,k,n}
-    vector<int> v = *(reinterpret_cast< vector<int>  *>(r)); 
-    int k = v[1],q = v[0],n = v[2];
-    int st = k + (q * (n-k)/NUM_THREADS);
-    int end = ((q+1)*(n-k)/NUM_THREADS);
+    struct arguments *a0 = (struct arguments *)r;
+    int k = a0 -> a2,q = a0 -> a1;
+    int st = k + (q*(n-k)/NUM_THREADS);
+    int end = k+ (q+1)*(n-k)/NUM_THREADS;
+
     for(int i = st; i<end;i++){
         for (int j = k; j<n;j++){
             a[i][j] = a[i][j] - l[i][k]* u[k][j];
         }
     }
+    if (q == NUM_THREADS-1){
+        for(int i = end; i < n; i++){
+            for(int j = k; j<n ;j++){
+            a[i][j] = a[i][j] - l[i][k]* u[k][j];
+            }
+        }
+    }
+    pthread_exit(NULL);
     return NULL;
 }
 
@@ -213,23 +213,23 @@ int main(int argc, char ** argv){
             //         a[i][j] = a[i][j] - (l[i][k] * u[k][j]);
             //     }
             // }   
-            // for (int i  = 0; i < NUM_THREADS; i++){
-            //     vector<int> q = {i,k,n};
-            //     pthread_create(&threads[i],NULL,secSwap,static_cast<void*>(&q));
-            // }
-            // for(int i = 0; i < NUM_THREADS; i++){
-            //     pthread_join(threads[i],NULL);
-            // }
+            for (int i  = 0; i < NUM_THREADS; i++){
+                vector<int> args = {i,k};
+                pthread_create(&threads[i],NULL,secSwap,(void *)&args);
+            }
+            for(int i = 0; i < NUM_THREADS; i++){
+                pthread_join(threads[i],NULL);
+            }
         // }else{
             // for (int i = k; i < n; i++){
             //     l[i][k] = a[i][k]/u[k][k];
             //     u[k][i] = a[k][i];
             // }
-            for (int i = k; i< n; i++){
-                for(int j = k ; j< n; j++){
-                    a[i][j] = a[i][j] - (l[i][k] * u[k][j]);
-                }
-            }            
+            // for (int i = k; i< n; i++){
+            //     for(int j = k ; j< n; j++){
+            //         a[i][j] = a[i][j] - (l[i][k] * u[k][j]);
+            //     }
+            // }            
         // }
 
     }
