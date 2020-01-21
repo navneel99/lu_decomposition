@@ -1,5 +1,6 @@
 # make pthread;
-for i in {0..4}
+for i in {0..9}
 do
-    ./p.out 1000;
+    ./a.out 500;
+    sleep 1;
 done

@@ -2,6 +2,9 @@
 #include <pthread.h>
 #include <bits/stdc++.h>
 #include <time.h>
+#include <chrono> 
+
+using namespace std::chrono; 
 using namespace std;
 
 typedef vector<float> ROW;
@@ -12,7 +15,7 @@ struct arguments{
     int a2;
 };
 
-#define NUM_THREADS 8
+#define NUM_THREADS 2
 
 MATRIX a,l,u;
 pthread_mutex_t mlock;
@@ -161,6 +164,7 @@ void* secSwap(void* r){
 }
 
 int main(int argc, char ** argv){
+    auto start = high_resolution_clock::now();
     if (argc == 2){
         n = stoi(argv[1]);
     }else{
@@ -168,10 +172,14 @@ int main(int argc, char ** argv){
     }
     srand(time(0));
 
+    // n = 3;
 
     pthread_mutex_init(&mlock,NULL);
     createMatrix();
-
+    // v = generateRandom(3);
+    // a[0][0] = 10.00;    a[0][1] = -7.00;    a[0][2] = 0.00;
+    // a[1][0] = -3.00;    a[1][1] = 2.00; a[1][2] = 6.00;
+    // a[2][0] = 5.00;    a[2][1] = -1.00; a[2][2] = 5.00;
     for (int  k = 0; k < n; k++){
         double m = 0;
         int ind = 0;
@@ -233,12 +241,17 @@ int main(int argc, char ** argv){
         // }
 
     }
-
+    auto stop = high_resolution_clock::now();
     // print_vector(a);
     // cout <<"---------"<<endl;
     // print_vector(l);
     // cout <<"---------"<<endl;
-    // print_vector(u);
+    print_vector(u);
+    auto duration = duration_cast<microseconds>(stop - start); 
+  
+    // To get the value of duration use the count() 
+    // member function on the duration object 
+    cout << duration.count() << endl; 
     
     
     
