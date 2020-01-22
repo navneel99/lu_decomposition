@@ -7,38 +7,52 @@
 using namespace std::chrono;
 using namespace std;
 
-typedef vector<double> ROW;
-typedef vector<ROW> MATRIX;
+#define NUM_THREADS 4
+
+// typedef vector<double> ROW;
+// typedef vector<ROW> MATRIX;
+
+// typedef double[matrix_size][matrix_size] MATRIX;
 
 struct arguments{
     int a1;
     int a2;
 };
 
-#define NUM_THREADS 8
 
-MATRIX a,l,u;
+// MATRIX a,l,u;
+
+const int matrix_size = 1000;
+
+double a[matrix_size][matrix_size];
+double l[matrix_size][matrix_size];
+double u[matrix_size][matrix_size];
+
+
+// l,u;
+
 pthread_mutex_t mlock;
-vector<int> p;
+// vector<int> p;
+int p[matrix_size] ;
 
 pthread_t threads[NUM_THREADS];
 
-int n;
+int n = matrix_size;
 
-int k2,q2;
+// int k2,q2;
 
 
-void print_vector(vector<vector<double> > v){
-    int n = v.size();
-    for (int i = 0; i < n; i++){
-        for (int j = 0; j< n; j++){
+void print_vector(double v[matrix_size][matrix_size] ){
+    // int n = v.size();
+    for (int i = 0; i < matrix_size; i++){
+        for (int j = 0; j< matrix_size; j++){
             cout << v[i][j]<<" ";
         }
         cout<<endl;
     }
 }
 
-double l2norm(MATRIX q1, MATRIX q2){
+double l2norm(double q1[matrix_size][matrix_size], double q2[matrix_size][matrix_size]){
     double ans = 0;
 
     for(int i = 0; i < n; i++){
@@ -50,51 +64,71 @@ double l2norm(MATRIX q1, MATRIX q2){
     return sqrt(ans);
 }
 
-MATRIX matmul(MATRIX q1, MATRIX q2){
-    MATRIX m(n,ROW(n,0));
-    for(int i = 0; i < n; i++){
-        for (int j = 0; j < n ;j++){
-            double s=0;
-            for (int k = 0; k< n;k++){
-                s+= q1[j][k] * q2[k][i];
-            }
-            m[i][j] = s;
-        }
-    }
-    return m;
-}
+// MATRIX matmul(MATRIX q1, MATRIX q2){
+//     MATRIX m(n,ROW(n,0));
+//     for(int i = 0; i < n; i++){
+//         for (int j = 0; j < n ;j++){
+//             double s=0;
+//             for (int k = 0; k< n;k++){
+//                 s+= q1[j][k] * q2[k][i];
+//             }
+//             m[i][j] = s;
+//         }
+//     }
+//     return m;
+// }
 
 void* generateRandom(void* arg){
     int jk = (int) arg;
-    MATRIX m;
-    int dum = (int)(n/NUM_THREADS);
-    for (int i = 0; i < dum; i++){
-        ROW r,s;
-        for(int j = 0; j<n;j++){
-            r.push_back(1 + (((float)rand()/RAND_MAX) * 100) );
-            s.push_back(0);
-        }
-        pthread_mutex_lock(&mlock);
-        a.push_back(r);
-        l.push_back(s);
-        u.push_back(s);
-        p.push_back(0);
-        pthread_mutex_unlock(&mlock);
+    // MATRIX m;
+    double m[matrix_size][matrix_size];
+    int st = (int)(jk * n/NUM_THREADS);
+    int end = (int)((jk+1) *n/NUM_THREADS);
+
+    for (int i = st; i<end;i++){
+      for(int j = 0; j < n; j++){
+        a[i][j] = (1 + ( ((float)rand()/RAND_MAX) * 100));
+        l[i][j] = 0;
+        u[i][j] = 0;
+      }
+      p[i] = 0;
     }
+    //   for (int i = 0; i < dum; i++){
+    //     ROW r,s;
+    //     for(int j = 0; j<n;j++){
+    //         r.push_back(1 + (((float)rand()/RAND_MAX) * 100) );
+    //         s.push_back(0);
+    //     }
+    //
+    //     pthread_mutex_lock(&mlock);
+    //     a.push_back(r);
+    //     l.push_back(s);
+    //     u.push_back(s);
+    //     p.push_back(0);
+    //     pthread_mutex_unlock(&mlock);
+    // }
     if (jk == NUM_THREADS - 1){
-        pthread_mutex_lock(&mlock);
-        for(int i = 0; i<(n%NUM_THREADS);i++){
-            ROW r,s;
-            for(int j = 0; j<n;j++){
-                r.push_back(1 + (((float)rand()/RAND_MAX) * 100) );
-                s.push_back(0);
-            }
-            a.push_back(r);
-            l.push_back(s);
-            u.push_back(s);
-            p.push_back(0);
+        // pthread_mutex_lock(&mlock);
+        for (int i =0; i < n%NUM_THREADS;i++){
+          for(int j = 0; j<n;j++){
+            a[i][j] = (1 + ( ((float)rand()/RAND_MAX) * 100));
+            l[i][j] = 0;
+            u[i][j] = 0;
+          }
+          p[i] = 0;
         }
-        pthread_mutex_unlock(&mlock);
+        // for(int i = 0; i<(n%NUM_THREADS);i++){
+        //     ROW r,s;
+        //     for(int j = 0; j<n;j++){
+        //         r.push_back(1 + (((float)rand()/RAND_MAX) * 100) );
+        //         s.push_back(0);
+        //     }
+        //     a.push_back(r);
+        //     l.push_back(s);
+        //     u.push_back(s);
+        //     p.push_back(0);
+        // }
+        // pthread_mutex_unlock(&mlock);
     }
     pthread_exit(NULL);
 
@@ -191,19 +225,20 @@ void* secSwap(void* r){
 
 int main(int argc, char ** argv){
     auto start = high_resolution_clock::now();
-    if (argc == 2){
-        n = stoi(argv[1]);
-    }else{
-        n = 500;
-    }
+    // if (arg/c == 2){
+        // n = stoi(argv[1]);
+    // }else{
+        // n = 500;
+    // }
     srand(time(0));
 
     // n = 3;
 
-    pthread_mutex_init(&mlock,NULL);
+    // pthread_mutex_init(&mlock,NULL);
     createMatrix();
+    // print_vector(a);
     // a = {{34.5575, 82.4529, 11.7004},{65.1702, 14.8189, 59.231},{48.3556, 27.7371, 4.53131}};
-    MATRIX aa = a;
+    // double aa[matrix_size][matrix_size] = a;
     for (int  k = 0; k < n; k++){
         double m = 0;
         int ind = 0;
@@ -221,9 +256,16 @@ int main(int argc, char ** argv){
         p[ind] = p[k];
         p[k] = t;
 
-        ROW tmp = a[ind];
-        a[ind] = a[k];
-        a[k] = tmp;
+        // ROW tmp = a[ind];
+        // double tmp[matrix_size] = a[ind];
+        // memcpy(tmp,a[ind],sizeof(tmp));
+        // a[ind] = a[k];
+        // a[k] = tmp;
+        for (int i = 0; i< n; i++){
+          double t = a[ind][i];
+          a[ind][i] = a[k][i];
+          a[k][i] = t;
+        }
 
         for (int i = 0; i <= k-1; i++){
             double t = l[k][i];
@@ -278,19 +320,26 @@ int main(int argc, char ** argv){
 
     }
     auto stop = high_resolution_clock::now();
-
-    MATRIX pp(n,vector<double>(n,0));
-    for(int i = 0; i<p.size(); i++){
-      pp[i][ p[i] ] = 1;
+    //
+    // MATRIX pp(n,vector<double>(n,0));
+    double pp[matrix_size][matrix_size];
+    for(int i = 0; i<matrix_size; i++){
+      for (int j =0 ; j < matrix_size; j++){
+        if (p[i] == j){
+          pp[i][j] = 1;
+        }else{
+          pp[i][j] = 0;
+        }
+      }
     }
     // print_vector(pp);
     cout<<"----------"<<endl;
-    cout<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
+    // cout<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
     cout<<"----------"<<endl;
     // print_vector(aa);
-    // cout <<"---------"<<endl;
+    cout <<"---------"<<endl;
     // print_vector(l);
-    // cout <<"---------"<<endl;
+    cout <<"---------"<<endl;
     // print_vector(u);
     auto duration = duration_cast<microseconds>(stop - start);
 
