@@ -2,4 +2,4 @@ compile:
 	g++ -lpthread code.cpp 
 
 pthread:
-	g++ -o p.out  -fpermissive test.cpp -lpthread
+	g++ -o p.out  -fpermissive pthreads.cpp -lpthread
