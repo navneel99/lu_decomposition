@@ -8,37 +8,30 @@
 using namespace std::chrono;
 using namespace std;
 
-// #define NUM_THREADS 8
 
-
+//struct to help in providing arguments to the pthread_create function
 struct arguments{
     int a1;
     int a2;
 };
 
-
+//Global variables
 int NUM_THREADS;
-int matrix_size;// = 7000;
-// const int n = matrix_size;
+int matrix_size;
 int n;
 
-double **a;// = (double**)malloc(n * sizeof(double*));
-double **l;// = (double**)malloc(n * sizeof(double*));
-double **u;// = (double**)malloc(n * sizeof(double*));
-double **pp;// = (double**)malloc(n * sizeof(double*));
-double **aa;// = (double**)malloc(n * sizeof(double*));
+double **a;
+double **l;
+double **u;
+double **pp;
+double **aa;
+int *p;
 
-
-
-
-// pthread_mutex_t mlock;
-
-int *p;// = (int*)malloc(n*sizeof(int));
-
+//Variable to return the L2 Norm as specified by the user
 bool v = false;
 
 
-
+//Helper Function, to help in debugging
 void print_vector(double** v ){
     for (int i = 0; i < matrix_size; i++){
         for (int j = 0; j< matrix_size; j++){
@@ -47,7 +40,7 @@ void print_vector(double** v ){
         cout<<endl;
     }
 }
-
+//Helper Function to get the L2,1 Norm
 double l2norm(double** q1, double** q2){
     double ans = 0;
 
@@ -60,6 +53,7 @@ double l2norm(double** q1, double** q2){
     return sqrt(ans);
 }
 
+//Matrix Multiplication Function
 double **matmul(double **q1, double **q2){
     double **m;
     m = (double**)malloc(n*sizeof(double*));
@@ -78,11 +72,15 @@ double **matmul(double **q1, double **q2){
     return m;
 }
 
+//Function to generate and fill random numbers in the matrix per thread.
 void* generateRandom(void* arg){
+    //returns the thread_id (from 0 to NUM_THREADS-1) 
     int jk = (int) arg;
+    //returns the starting and the ending row indices to fill by this thread.
     int st = (int)(jk * n/NUM_THREADS);
     int end = (int)((jk+1) *n/NUM_THREADS);
-    unsigned seed = system_clock::now().time_since_epoch().count() + (rand()%NUM_THREADS);
+    //Gives the reentrant seed particularly for this thread by munging the system clock with the thread_id
+    unsigned seed = system_clock::now().time_since_epoch().count() + (rand()%(NUM_THREADS+jk));
     mt19937 generator(seed);
     for (int i = st; i<end;i++){
       for(int j = 0; j < n; j++){
@@ -118,6 +116,7 @@ void* generateRandom(void* arg){
     return NULL;
 }
 
+//Initializes the L and p matrices by adding 1 at the diagonal in L and i in p
 void * matrixInit(void* r){
     int q = (int) r;
     int st = q * (n/NUM_THREADS),end = (q+1) * (n/NUM_THREADS);
@@ -137,10 +136,12 @@ void * matrixInit(void* r){
 
 
 
-
+//First calculation
 void* firstSwap(void* r){
     arguments *a0 = (arguments *)r;
+    //k contains the column number; q contains the thread id
     int k = a0 -> a2,q = a0 -> a1;
+    //start and end row for each matrix
     int st = k+1 + (q*(n-k-1)/NUM_THREADS);
     int end = k+1 + (q+1)*(n-k-1)/NUM_THREADS;
     for (int i =st; i<end; i++){
@@ -158,6 +159,7 @@ void* firstSwap(void* r){
 }
 
 void* secSwap(void* r){
+    //Same as the function firstSwap
     arguments *a0 = (arguments *)r;
     int k = a0 -> a2,q = a0 -> a1;
     int st = k+1 + (q*(n-k-1)/NUM_THREADS);
@@ -181,19 +183,24 @@ void* secSwap(void* r){
 
 int main(int argc, char ** argv){
     if (argc == 4){
+    //If there are 4 arguments
         NUM_THREADS = stoi(argv[1]);
         matrix_size = stoi(argv[2]);
+        //v refers to whether we want to get the L2 norm or not
         v = (stoi(argv[3]) == 0)?false:true;
     }else if (argc == 3){
+    //If there are 3 arguments
         NUM_THREADS = stoi(argv[1]);
         matrix_size = stoi(argv[2]);
     }else{
+    //Wrong number of arguments
         cout<<"Wrong Number of Arguments Passed. Exiting...\n";
         return 0;
     }
     n = matrix_size;
     pthread_t threads[NUM_THREADS];
 
+    //Allocating memoru for the arrays
     a = (double**)malloc(n * sizeof(double*));
     l = (double**)malloc(n * sizeof(double*));
     u = (double**)malloc(n * sizeof(double*));
@@ -202,8 +209,9 @@ int main(int argc, char ** argv){
         pp = (double**)malloc(n * sizeof(double*));
         aa = (double**)malloc(n * sizeof(double*));
     }
-
+    
     for (int i = 0; i< n; i++){
+        //allocating memory for each row in the array.
         a[i] = (double*)malloc(n * sizeof(double));
         l[i] = (double*)malloc(n * sizeof(double));
         u[i] = (double*)malloc(n * sizeof(double));
@@ -213,11 +221,11 @@ int main(int argc, char ** argv){
         }
 
     }
+    //Clock Start
     auto start = high_resolution_clock::now();
+    //Seed for inside the random number generator
     srand(time(0));
 
-
-    // createMatrix();
     for ( int i = 0; i < NUM_THREADS; i++){
         int ti = pthread_create(&threads[i],NULL,generateRandom,(void *)i);
     }
@@ -236,10 +244,11 @@ int main(int argc, char ** argv){
 
 
 
-
+    //For each column number
     for (int  k = 0; k < n; k++){
         double m = 0;
         int ind = 0;
+        //Get max of the current column from beneath the diagonal
         for (int  i  = k; i<n; i++){
             if (m < abs(a[i][k])){
                 m = abs(a[i][k]);
@@ -250,22 +259,26 @@ int main(int argc, char ** argv){
             cerr << "Singular Matrix"<<endl;
             break;
         }
+        //Swapping p
         double t = p[ind];
         p[ind] = p[k];
         p[k] = t;
 
+        //swapping row in a
         double* temp = a[ind];
         a[ind] = a[k];
         a[k] = temp;
-
+        //Swapping specific slice in l
         for (int i = 0; i <= k-1; i++){
             double t = l[k][i];
             l[k][i] = l[ind][i];
             l[ind][i] = t;
         }
         u[k][k] = a[k][k];
+        //Generate an argument list to send to the thread.
         arguments * argList;
         argList = malloc(NUM_THREADS * sizeof(arguments));
+        //Function for the first loop
             for (int i  = 0; i < NUM_THREADS; i++){
                 (argList + i) -> a1 = i;
                 (argList + i) -> a2 = k;
@@ -276,7 +289,7 @@ int main(int argc, char ** argv){
             }
           free(argList);
           argList = malloc(NUM_THREADS * sizeof(arguments));
-
+        //Function for the second loop
             for (int i  = 0; i < NUM_THREADS; i++){
                 (argList + i) -> a1 = i;
                 (argList + i) -> a2 = k;
@@ -286,31 +299,18 @@ int main(int argc, char ** argv){
                 pthread_join(threads[i],NULL);
             }
     }
-    // }
+    //Clock Stop
     auto stop = high_resolution_clock::now();
+    //We calculate duration here.
     auto duration = duration_cast<microseconds>(stop - start);
     cout <<"Time taken in microseconds: "<< duration.count() << endl;
     if (v){
+        //This code executes only if v is true
         for(int i = 0; i<n; i++){
             pp[i][p[i]] = 1;        
         }
-        // print_vector(pp);
         cout<<"L2,1 norm: "<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
     }
-
-    
-    // cout<<"----------"<<endl;
-    // cout<<"----------"<<endl;
-    // print_vector(a);
-    // cout <<"---------"<<endl;
-    // print_vector(l);
-    // cout <<"---------"<<endl;
-    // print_vector(u);
-
-    // To get the value of duration use the count()
-    // member function on the duration object
-
-
 
     return 0;
 
