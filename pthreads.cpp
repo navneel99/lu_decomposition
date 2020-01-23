@@ -3,42 +3,52 @@
 #include <bits/stdc++.h>
 #include <time.h>
 #include <chrono>
+#include <random>
 
 using namespace std::chrono;
 using namespace std;
 
-typedef vector<double> ROW;
-typedef vector<ROW> MATRIX;
+// #define NUM_THREADS 8
+
 
 struct arguments{
     int a1;
     int a2;
 };
 
-#define NUM_THREADS 8
 
-MATRIX a,l,u;
-pthread_mutex_t mlock;
-vector<int> p;
-
-pthread_t threads[NUM_THREADS];
-
+int NUM_THREADS;
+int matrix_size;// = 7000;
+// const int n = matrix_size;
 int n;
 
-int k2,q2;
+double **a;// = (double**)malloc(n * sizeof(double*));
+double **l;// = (double**)malloc(n * sizeof(double*));
+double **u;// = (double**)malloc(n * sizeof(double*));
+double **pp;// = (double**)malloc(n * sizeof(double*));
+double **aa;// = (double**)malloc(n * sizeof(double*));
 
 
-void print_vector(vector<vector<double> > v){
-    int n = v.size();
-    for (int i = 0; i < n; i++){
-        for (int j = 0; j< n; j++){
+
+
+// pthread_mutex_t mlock;
+
+int *p;// = (int*)malloc(n*sizeof(int));
+
+bool v = false;
+
+
+
+void print_vector(double** v ){
+    for (int i = 0; i < matrix_size; i++){
+        for (int j = 0; j< matrix_size; j++){
             cout << v[i][j]<<" ";
         }
         cout<<endl;
     }
 }
 
-double l2norm(MATRIX q1, MATRIX q2){
+double l2norm(double** q1, double** q2){
     double ans = 0;
 
     for(int i = 0; i < n; i++){
@@ -50,8 +60,12 @@ double l2norm(MATRIX q1, MATRIX q2){
     return sqrt(ans);
 }
 
-MATRIX matmul(MATRIX q1, MATRIX q2){
-    MATRIX m(n,ROW(n,0));
+double **matmul(double **q1, double **q2){
+    double **m;
+    m = (double**)malloc(n*sizeof(double*));
+    for(int i = 0; i<n; i++){
+        m[i] = (double*)malloc(n*sizeof(double));
+    }   
     for(int i = 0; i < n; i++){
         for (int j = 0; j < n ;j++){
             double s=0;
@@ -66,41 +80,41 @@ MATRIX matmul(MATRIX q1, MATRIX q2){
 
 void* generateRandom(void* arg){
     int jk = (int) arg;
-    MATRIX m;
-    int dum = (int)(n/NUM_THREADS);
-    for (int i = 0; i < dum; i++){
-        ROW r,s;
-        for(int j = 0; j<n;j++){
-            r.push_back(1 + (((float)rand()/RAND_MAX) * 100) );
-            s.push_back(0);
+    int st = (int)(jk * n/NUM_THREADS);
+    int end = (int)((jk+1) *n/NUM_THREADS);
+    unsigned seed = system_clock::now().time_since_epoch().count() + (rand()%NUM_THREADS);
+    mt19937 generator(seed);
+    for (int i = st; i<end;i++){
+      for(int j = 0; j < n; j++){
+
+        double tmp = (1 + ( (((float)generator())/generator.max()) * 100));
+        a[i][j] = tmp;
+        l[i][j] = 0;
+        u[i][j] = 0;
+        if (v){
+            pp[i][j] = 0;
+            aa[i][j] = tmp;
         }
-        pthread_mutex_lock(&mlock);
-        a.push_back(r);
-        l.push_back(s);
-        u.push_back(s);
-        p.push_back(0);
-        pthread_mutex_unlock(&mlock);
+      }
+      p[i] = 0;
     }
     if (jk == NUM_THREADS - 1){
-        pthread_mutex_lock(&mlock);
-        for(int i = 0; i<(n%NUM_THREADS);i++){
-            ROW r,s;
-            for(int j = 0; j<n;j++){
-                r.push_back(1 + (((float)rand()/RAND_MAX) * 100) );
-                s.push_back(0);
+        for (int i =0; i < n%NUM_THREADS;i++){
+          for(int j = 0; j<n;j++){
+            double tmp = (1 + ( (((float)generator())/generator.max()) * 100));
+
+            a[i][j] = tmp;
+            l[i][j] = 0;
+            u[i][j] = 0;
+            if (v){
+                aa[i][j] = tmp;
+                pp[i][j] = 0;
             }
-            a.push_back(r);
-            l.push_back(s);
-            u.push_back(s);
-            p.push_back(0);
+          }
+          p[i] = 0;
         }
-        pthread_mutex_unlock(&mlock);
     }
     pthread_exit(NULL);
-
-    // pthread_mutex_lock(&mlock);
-    // a.insert(a.end(),m.begin(),m.end());
-    // pthread_mutex_unlock(&mlock);
     return NULL;
 }
 
@@ -122,36 +136,13 @@ void * matrixInit(void* r){
 }
 
 
-void createMatrix(){
-
-    for ( int i = 0; i < NUM_THREADS; i++){
-        int ti = pthread_create(&threads[i],NULL,generateRandom,(void *)i);
-    }
-
-    for(int i =0; i< NUM_THREADS;i++){
-        int a = pthread_join(threads[i],NULL);
-    }
-
-    for ( int i = 0; i < NUM_THREADS; i++){
-        int ti = pthread_create(&threads[i],NULL,matrixInit,(void *)i);
-    }
-
-    for(int i =0; i< NUM_THREADS;i++){
-        int w = pthread_join(threads[i],NULL);
-    }
-
-}
 
 
 void* firstSwap(void* r){
-    // pthread_mutex_lock(&mlock);
     arguments *a0 = (arguments *)r;
     int k = a0 -> a2,q = a0 -> a1;
-    // cout<<k<<"||"<<q<<endl;
     int st = k+1 + (q*(n-k-1)/NUM_THREADS);
     int end = k+1 + (q+1)*(n-k-1)/NUM_THREADS;
-    // cout<<st<<" "<<end<<" "<<q<<" "<<k<<" "<<endl;//st<<" "<<st<<" "
-    // pthread_mutex_unlock(&mlock);
     for (int i =st; i<end; i++){
         l[i][k] = a[i][k]/float(u[k][k]);
         u[k][i] = a[k][i];
@@ -162,7 +153,6 @@ void* firstSwap(void* r){
             u[k][i] = a[k][i];
         }
     }
-    // free(r);
     pthread_exit(NULL);
     return NULL;
 }
@@ -190,20 +180,63 @@ void* secSwap(void* r){
 }
 
 int main(int argc, char ** argv){
-    auto start = high_resolution_clock::now();
-    if (argc == 2){
-        n = stoi(argv[1]);
+    if (argc == 4){
+        NUM_THREADS = stoi(argv[1]);
+        matrix_size = stoi(argv[2]);
+        v = (stoi(argv[3]) == 0)?false:true;
+    }else if (argc == 3){
+        NUM_THREADS = stoi(argv[1]);
+        matrix_size = stoi(argv[2]);
     }else{
-        n = 500;
+        cout<<"Wrong Number of Arguments Passed. Exiting...\n";
+        return 0;
     }
+    n = matrix_size;
+    pthread_t threads[NUM_THREADS];
+
+    a = (double**)malloc(n * sizeof(double*));
+    l = (double**)malloc(n * sizeof(double*));
+    u = (double**)malloc(n * sizeof(double*));
+    p = (int*)malloc(n*sizeof(int));
+    if (v){
+        pp = (double**)malloc(n * sizeof(double*));
+        aa = (double**)malloc(n * sizeof(double*));
+    }
+
+    for (int i = 0; i< n; i++){
+        a[i] = (double*)malloc(n * sizeof(double));
+        l[i] = (double*)malloc(n * sizeof(double));
+        u[i] = (double*)malloc(n * sizeof(double));
+        if (v){
+            pp[i] = (double*)malloc(n * sizeof(double));
+            aa[i] = (double*)malloc(n * sizeof(double));
+        }
+
+    }
+    auto start = high_resolution_clock::now();
     srand(time(0));
 
-    // n = 3;
 
-    pthread_mutex_init(&mlock,NULL);
-    createMatrix();
-    // a = {{34.5575, 82.4529, 11.7004},{65.1702, 14.8189, 59.231},{48.3556, 27.7371, 4.53131}};
-    MATRIX aa = a;
+    // createMatrix();
+    for ( int i = 0; i < NUM_THREADS; i++){
+        int ti = pthread_create(&threads[i],NULL,generateRandom,(void *)i);
+    }
+    for(int i =0; i< NUM_THREADS;i++){
+        int a = pthread_join(threads[i],NULL);
+    }
+
+    for ( int i = 0; i < NUM_THREADS; i++){
+        int ti = pthread_create(&threads[i],NULL,matrixInit,(void *)i);
+    }
+
+    for(int i =0; i< NUM_THREADS;i++){
+        int w = pthread_join(threads[i],NULL);
+    }
+
+
+
+
+
     for (int  k = 0; k < n; k++){
         double m = 0;
         int ind = 0;
@@ -221,9 +254,9 @@ int main(int argc, char ** argv){
         p[ind] = p[k];
         p[k] = t;
 
-        ROW tmp = a[ind];
+        double* temp = a[ind];
         a[ind] = a[k];
-        a[k] = tmp;
+        a[k] = temp;
 
         for (int i = 0; i <= k-1; i++){
             double t = l[k][i];
@@ -231,17 +264,11 @@ int main(int argc, char ** argv){
             l[ind][i] = t;
         }
         u[k][k] = a[k][k];
-        // struct arguments* args;
-        // if ((n-k) > NUM_THREADS){
         arguments * argList;
         argList = malloc(NUM_THREADS * sizeof(arguments));
             for (int i  = 0; i < NUM_THREADS; i++){
-                // arguments args = {i,k};
-                // (*args).a1 = i;
-                // (*args).a2 = k;
                 (argList + i) -> a1 = i;
                 (argList + i) -> a2 = k;
-                // cout<<i<<";;"<<k<<endl;
                 pthread_create(&threads[i],NULL,firstSwap,(void *)(argList+i));
             }
             for(int i = 0; i < NUM_THREADS; i++){
@@ -250,13 +277,7 @@ int main(int argc, char ** argv){
           free(argList);
           argList = malloc(NUM_THREADS * sizeof(arguments));
 
-            // for (int i = k; i< n; i++){
-            //     for(int j = k ; j< n; j++){
-            //         a[i][j] = a[i][j] - (l[i][k] * u[k][j]);
-            //     }
-            // }
             for (int i  = 0; i < NUM_THREADS; i++){
-                // vector<int> args = {i,k};
                 (argList + i) -> a1 = i;
                 (argList + i) -> a2 = k;
                 pthread_create(&threads[i],NULL,secSwap,(void *)(argList+i));
@@ -264,39 +285,30 @@ int main(int argc, char ** argv){
             for(int i = 0; i < NUM_THREADS; i++){
                 pthread_join(threads[i],NULL);
             }
-        // }else{
-            // for (int i = k+1; i < n; i++){
-            //     l[i][k] = a[i][k]/u[k][k];
-            //     u[k][i] = a[k][i];
-            // }
-            // for (int i = k+1; i< n; i++){
-            //     for(int j = k+1 ; j< n; j++){
-            //         a[i][j] = a[i][j] - (l[i][k] * u[k][j]);
-            //     }
-            // }
-        // }
-
     }
+    // }
     auto stop = high_resolution_clock::now();
-
-    MATRIX pp(n,vector<double>(n,0));
-    for(int i = 0; i<p.size(); i++){
-      pp[i][ p[i] ] = 1;
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout <<"Time taken in microseconds: "<< duration.count() << endl;
+    if (v){
+        for(int i = 0; i<n; i++){
+            pp[i][p[i]] = 1;        
+        }
+        // print_vector(pp);
+        cout<<"L2,1 norm: "<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
     }
-    // print_vector(pp);
-    cout<<"----------"<<endl;
-    cout<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
-    cout<<"----------"<<endl;
-    // print_vector(aa);
+
+    
+    // cout<<"----------"<<endl;
+    // cout<<"----------"<<endl;
+    // print_vector(a);
     // cout <<"---------"<<endl;
     // print_vector(l);
     // cout <<"---------"<<endl;
     // print_vector(u);
-    auto duration = duration_cast<microseconds>(stop - start);
 
     // To get the value of duration use the count()
     // member function on the duration object
-    cout << duration.count() << endl;
 
 
 
