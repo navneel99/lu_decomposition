@@ -7,12 +7,8 @@
 using namespace std::chrono;
 using namespace std;
 
-#define NUM_THREADS 4
+#define NUM_THREADS 8
 
-// typedef vector<double> ROW;
-// typedef vector<ROW> MATRIX;
-
-// typedef double[matrix_size][matrix_size] MATRIX;
 
 struct arguments{
     int a1;
@@ -20,28 +16,17 @@ struct arguments{
 };
 
 
-// MATRIX a,l,u;
 
 const int matrix_size = 7000;
 const int n = matrix_size;
 
-// double a[matrix_size][matrix_size];
-// double l[matrix_size][matrix_size];
-// double u[matrix_size][matrix_size];
-
-// double **a;
-// double **aa;
-
-// double **l;
-// double **u;
-// double **pp;
 
 double **a = (double**)malloc(n * sizeof(double*));
-double **aa = (double**)malloc(n * sizeof(double*));
+// double **aa = (double**)malloc(n * sizeof(double*));
 
 double **l = (double**)malloc(n * sizeof(double*));
 double **u = (double**)malloc(n * sizeof(double*));
-double **pp = (double**)malloc(n * sizeof(double*));
+// double **pp = (double**)malloc(n * sizeof(double*));
 
 // int i;
 
@@ -126,10 +111,10 @@ void* generateRandom(void* arg){
       for(int j = 0; j < n; j++){
         double tmp = (1 + ( ((float)rand()/RAND_MAX) * 100));
         a[i][j] = tmp;
-        aa[i][j] = tmp;
+        // aa[i][j] = tmp;
         l[i][j] = 0;
         u[i][j] = 0;
-        pp[i][j] = 0;
+        // pp[i][j] = 0;
       }
       p[i] = 0;
     }
@@ -153,10 +138,10 @@ void* generateRandom(void* arg){
           for(int j = 0; j<n;j++){
             double tmp = (1 + ( ((float)rand()/RAND_MAX) * 100)); 
             a[i][j] = tmp;
-            aa[i][j] = tmp;
+            // aa[i][j] = tmp;
             l[i][j] = 0;
             u[i][j] = 0;
-            pp[i][j] = 0;
+            // pp[i][j] = 0;
           }
           p[i] = 0;
         }
@@ -267,10 +252,10 @@ void* secSwap(void* r){
 int main(int argc, char ** argv){
     for (int i = 0; i< n; i++){
     a[i] = (double*)malloc(n * sizeof(double));
-    aa[i] = (double*)malloc(n * sizeof(double));
+    // aa[i] = (double*)malloc(n * sizeof(double));
     l[i] = (double*)malloc(n * sizeof(double));
     u[i] = (double*)malloc(n * sizeof(double));
-    pp[i] = (double*)malloc(n * sizeof(double));
+    // pp[i] = (double*)malloc(n * sizeof(double));
 
 }
     auto start = high_resolution_clock::now();
@@ -285,6 +270,7 @@ int main(int argc, char ** argv){
 
     // pthread_mutex_init(&mlock,NULL);
     createMatrix();
+    cout<<"Matrix Created."<<endl;
     // print_vector(a);
     // a = {{34.5575, 82.4529, 11.7004},{65.1702, 14.8189, 59.231},{48.3556, 27.7371, 4.53131}};
     // double aa[matrix_size][matrix_size] = a;
@@ -310,11 +296,14 @@ int main(int argc, char ** argv){
         // memcpy(tmp,a[ind],sizeof(tmp));
         // a[ind] = a[k];
         // a[k] = tmp;
-        for (int i = 0; i< n; i++){
-          double t = a[ind][i];
-          a[ind][i] = a[k][i];
-          a[k][i] = t;
-        }
+        double* temp = a[ind];
+        a[ind] = a[k];
+        a[k] = temp;
+        // for (int i = 0; i< n; i++){
+        //   double t = a[ind][i];
+        //   a[ind][i] = a[k][i];
+        //   a[k][i] = t;
+        // }
 
         for (int i = 0; i <= k-1; i++){
             double t = l[k][i];
@@ -366,7 +355,13 @@ int main(int argc, char ** argv){
             //     }
             // }
         // }
-
+    if (k%100 ==0){
+        cout<<k<<"\n";
+    }else{
+        if (k%10 == 0){
+            cout<<k<<" ";
+        }
+    }
     }
     auto stop = high_resolution_clock::now();
     //
@@ -374,10 +369,10 @@ int main(int argc, char ** argv){
     // double **pp = make2Dmatrix(n, true, false);
     // double **pp;
     // pp = (doubtl)
-    for(int i = 0; i<n; i++){
-        pp[i][p[i]] = 1;
+    // for(int i = 0; i<n; i++){
+    //     pp[i][p[i]] = 1;
         
-    }
+    // }
     // print_vector(pp);
     cout<<"----------"<<endl;
     // cout<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
