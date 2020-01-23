@@ -85,16 +85,19 @@ int main(int argc, char const *argv[]){
     for ( int k = 0; k < n;k++){ // For each column 
         double m = 0;
         int ind = 0;
+        
         for (int i = k;i<n;i++){
             if (m < abs(v[i][k])){
                 m = abs(v[i][k]);
                 ind = i;
             }
         }
+        
         if (m == 0){
             cerr <<"Singular Matrix!";
             break;
         }
+
         double t = p[ind];
         p[ind] = p[k];
         p[k] = t;

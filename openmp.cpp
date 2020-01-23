@@ -1,8 +1,7 @@
-#include <iostream>
-#include <pthread.h>
 #include <bits/stdc++.h>
 #include <chrono> 
-#include <time.h>
+// #include <time.h>
+#include <omp.h>
 
 using namespace std::chrono; 
 using namespace std;
@@ -43,6 +42,7 @@ MATRIX matmul(MATRIX q1, MATRIX q2){
 double l2norm(MATRIX q1, MATRIX q2){
     double ans = 0;
 
+    # pragma omp parallel for collapse(2)
     for(int i = 0; i < n; i++){
         for (int j = 0; j < n ;j++){
             ans = ans + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
@@ -54,8 +54,10 @@ double l2norm(MATRIX q1, MATRIX q2){
 
 MATRIX generateRandom(int n){
     MATRIX v(n,vector<double>(n,0));
-    for (int i = 0; i < n; i++){
-        for(int j = 0; j<n;j++){
+
+    # pragma omp parallel for collapse(2)
+    for(int i = 0; i < n; i++){
+        for(int j = 0; j<n; j++){
             v[i][j] = 1 + ((float)(rand())/RAND_MAX * 100);
         }
     }
@@ -66,13 +68,17 @@ int main(int argc, char const *argv[]){
     srand(time(0));
     auto start = high_resolution_clock::now();
     n  = stoi(argv[1]);
+    int thread_count = 4;
+    int chunk_size = 20;
+    int p[n];
     
     MATRIX v,l(n,vector<double>(n,0)),u(n,vector<double>(n,0));
+    #pragma omp parallel for schedule(static, chunk_size)
     for(int i = 0; i < n; i++){
         l[i][i] = 1;
     }
     
-    vector<int> p(n,0);
+    #pragma omp parallel for schedule(static, chunk_size)
     for(int i = 0; i < n ;i++){
         p[i] = i+1;
     }
@@ -85,24 +91,37 @@ int main(int argc, char const *argv[]){
     for ( int k = 0; k < n;k++){ // For each column 
         double m = 0;
         int ind = 0;
+
+        //Loop can be parallelised
+        # pragma omp parallel for schedule(static, chunk_size)
         for (int i = k;i<n;i++){
             if (m < abs(v[i][k])){
                 m = abs(v[i][k]);
                 ind = i;
             }
         }
+
         if (m == 0){
             cerr <<"Singular Matrix!";
             break;
         }
+
         double t = p[ind];
         p[ind] = p[k];
         p[k] = t;
         
+        //This operation can also be parallelised constant time for each iteration, no load balancing issue here(swaping in A)
         vector<double> temp = v[ind];
-        v[ind] = v[k];
-        v[k] = temp;
+        
+        # pragma omp parallel for schedule(static, chunk_size)
+        for(int i = 0; i<temp.size(); i++){
+            double tem = v[ind][i];
+            v[ind][i] = v[k][i];
+            v[k][i] = tem;
+        }
 
+        //Loop can be parallelised constant time for each iteration, no load balancing issue here(swaping in L)
+        # pragma omp parallel for schedule(static, chunk_size)
         for ( int i = 0; i<=k-1;i++){
             double tm = l[k][i];
             l[k][i] = l[ind][i];
@@ -111,11 +130,16 @@ int main(int argc, char const *argv[]){
 
         u[k][k] = v[k][k];
 
+        //Loop can be parallelised constant time for reach iteration hence no load balancing issue here
+        // int u_k_k = u[k][k];
+        # pragma omp parallel for schedule(static, chunk_size)
         for (int i = k+1; i < n; i++){
             l[i][k] = v[i][k]/u[k][k];
             u[k][i] = v[k][i];
         }
 
+        //Loop can be parallelised constant time for each iteration for inner loop but variable time for outer loop
+        # pragma omp parallel for collapse(2)
         for (int i = k+1; i< n; i++){
             for(int j = k+1 ; j< n; j++){
                 v[i][j] = v[i][j] - (l[i][k] * u[k][j]);
@@ -126,19 +150,19 @@ int main(int argc, char const *argv[]){
     auto duration = duration_cast<microseconds>(stop - start); 
     cout<< "--" << duration.count() << endl; 
 
-    //Converting p of size(n,1) to matrix of size (n,n) for calculation of PA
-    MATRIX pp = generateRandom(p.size());
-    for(int i = 0; i<p.size(); i++){
-        for(int j = 0; j<p.size(); j++){
-            if(p[i] == j+1){
-                pp[i][j] = 1;
-            }else{
-                pp[i][j] = 0;
-            }
-        }
-    }
+    // Converting p of size(n,1) to matrix of size (n,n) for calculation of PA
+    // MATRIX pp = generateRandom(n);
+    // for(int i = 0; i<n; i++){
+    //     for(int j = 0; j<n; j++){
+    //         if(p[i] == j+1){
+    //             pp[i][j] = 1;
+    //         }else{
+    //             pp[i][j] = 0;
+    //         }
+    //     }
+    // }
 
-    cout<<l2norm(matmul(pp, a), matmul(l, u))<<endl;
+    // cout<<l2norm(matmul(pp, a), matmul(l, u))<<endl;
 
 
     return 0;
