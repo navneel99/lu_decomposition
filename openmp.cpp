@@ -1,31 +1,68 @@
 #include <bits/stdc++.h>
 #include <chrono> 
-// #include <time.h>
 #include <omp.h>
+#include <math.h>
 
 using namespace std::chrono; 
 using namespace std;
 
 int n ;
+int n_thread;
 
+//Calculation of l2 norm given two matrices q1 and q2
+double l2norm(double **q1, double **q2){
+    double ans = 0;
 
-typedef vector<double> ROW;
-typedef vector<ROW> MATRIX;
-
-//Printing the matrix
-void print_vector(MATRIX v){
-    int n = v.size();
-    for (int i = 0; i < n; i++){
-        for (int j = 0; j< n; j++){
-            cout << v[i][j]<<" ";
+    for(int i = 0; i < n; i++){
+        for (int j = 0; j < n ;j++){
+            ans = ans + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
+            
         }
-        cout<<endl;
+    }
+    return sqrt(ans);
+}
+
+//function that print an array
+void print_array(double **d, int n){
+    for(int i = 0; i<n; i++){
+        for(int j = 0; j<n; j++){
+            printf("%f ", d[i][j]);
+        }
+        printf("\n");
     }
 }
 
+//function to make an 2D matrix and return the pointer to it
+double **make2Dmatrix(int n, bool init, bool isl){
+    int i;
+    double **m;
+    m = (double**)malloc(n*sizeof(double*));
+    for(i = 0; i<n; i++){
+        m[i] = (double*)malloc(n*sizeof(double));
+    }
+    if(init){
+        for(int i = 0; i<n; i++){
+            for(int j = 0; j<n; j++){
+                if(isl && i == j){
+                    m[i][j] = 1;
+                }else{
+                    m[i][j] = 0;
+                }
+            }
+        }
+    }else{
+        for(int i = 0; i<n; i++){
+            for(int j = 0; j<n; j++){
+                m[i][j] = 1 + ((float)(rand())/RAND_MAX * 100);
+            }
+        }
+    }
+    return m;
+}
+
 //Matrix multiplication of two matrices q1 and q2
-MATRIX matmul(MATRIX q1, MATRIX q2){
-    MATRIX m(n,ROW(n,0));
+double **matmul(double **q1, double **q2){
+   double **m = make2Dmatrix(n, false, false);
     for(int i = 0; i < n; i++){
         for (int j = 0; j < n ;j++){
             double s=0;
@@ -38,132 +75,110 @@ MATRIX matmul(MATRIX q1, MATRIX q2){
     return m;
 }
 
-//Calculation of l2 norm given two matrices q1 and q2
-double l2norm(MATRIX q1, MATRIX q2){
-    double ans = 0;
-
-    # pragma omp parallel for collapse(2)
-    for(int i = 0; i < n; i++){
-        for (int j = 0; j < n ;j++){
-            ans = ans + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
-            
-        }
-    }
-    return sqrt(ans);
-}
-
-MATRIX generateRandom(int n){
-    MATRIX v(n,vector<double>(n,0));
-
-    # pragma omp parallel for collapse(2)
-    for(int i = 0; i < n; i++){
-        for(int j = 0; j<n; j++){
-            v[i][j] = 1 + ((float)(rand())/RAND_MAX * 100);
-        }
-    }
-    return v;
-}
-
 int main(int argc, char const *argv[]){
     srand(time(0));
     auto start = high_resolution_clock::now();
+    
     n  = stoi(argv[1]);
-    int thread_count = 4;
-    int chunk_size = 20;
-    int p[n];
+    n_thread = stoi(argv[2]);
+    int verify = stoi(argv[3]);
+    int batch_size = ceil(n/n_thread);
     
-    MATRIX v,l(n,vector<double>(n,0)),u(n,vector<double>(n,0));
-    #pragma omp parallel for schedule(static, chunk_size)
-    for(int i = 0; i < n; i++){
-        l[i][i] = 1;
-    }
+
+    double **v = make2Dmatrix(n, false, false);
+    double **l = make2Dmatrix(n, true, true);
+    double **u = make2Dmatrix(n, true, false);
+    int *p = (int*)malloc(n*sizeof(int));
     
-    #pragma omp parallel for schedule(static, chunk_size)
-    for(int i = 0; i < n ;i++){
+    #pragma omp parallel for schedule(static, batch_size)
+    for(int i = 0; i<n; i++){
         p[i] = i+1;
     }
 
-    v = generateRandom(n);
-    
-    MATRIX a = v;
+    double **a = make2Dmatrix(n, false, false);
 
+    //Disabling the dynamic teams so that at run time number of threads is not changed
+    omp_set_dynamic(0);
+    omp_set_num_threads(n_thread);
 
-    for ( int k = 0; k < n;k++){ // For each column 
-        double m = 0;
-        int ind = 0;
+    #pragma omp parallel for collapse(2)
+    for(int i = 0; i<n; i++){
+        for(int j = 0; j<n; j++){
+            a[i][j] = v[i][j];
+        }
+    }
 
-        //Loop can be parallelised
-        # pragma omp parallel for schedule(static, chunk_size)
+    //LU decomposition using partial pivoting iterating over columns
+    for ( int k = 0; k < n;k++){
+        double m = 0; 
+        int ind = 0; 
+        // cout<<;
+        // cout<<"Number of Threads : "<<omp_get_num_threads()<<endl;
+        #pragma omp parallel for shared(m, k, ind)
         for (int i = k;i<n;i++){
             if (m < abs(v[i][k])){
                 m = abs(v[i][k]);
                 ind = i;
             }
-        }
+        }  
+        //Implicit barrier. It is needed because max value can be concluded only after viewing all the values of the matrix.
 
         if (m == 0){
             cerr <<"Singular Matrix!";
             break;
         }
 
+        
         double t = p[ind];
         p[ind] = p[k];
         p[k] = t;
-        
-        //This operation can also be parallelised constant time for each iteration, no load balancing issue here(swaping in A)
-        vector<double> temp = v[ind];
-        
-        # pragma omp parallel for schedule(static, chunk_size)
-        for(int i = 0; i<temp.size(); i++){
-            double tem = v[ind][i];
-            v[ind][i] = v[k][i];
-            v[k][i] = tem;
-        }
 
-        //Loop can be parallelised constant time for each iteration, no load balancing issue here(swaping in L)
-        # pragma omp parallel for schedule(static, chunk_size)
-        for ( int i = 0; i<=k-1;i++){
-            double tm = l[k][i];
-            l[k][i] = l[ind][i];
-            l[ind][i] = tm;
-        }
+        double *tem = v[ind];
+        v[ind] = v[k];
+        v[k] = tem;
 
         u[k][k] = v[k][k];
 
-        //Loop can be parallelised constant time for reach iteration hence no load balancing issue here
-        // int u_k_k = u[k][k];
-        # pragma omp parallel for schedule(static, chunk_size)
-        for (int i = k+1; i < n; i++){
-            l[i][k] = v[i][k]/u[k][k];
-            u[k][i] = v[k][i];
+        #pragma omp parallel shared(l, u, v, k)
+        {
+            #pragma omp for schedule(static) nowait
+            for ( int i = 0; i<=k-1;i++){
+                double tm = l[k][i];
+                l[k][i] = l[ind][i];
+                l[ind][i] = tm;
+            }
+            #pragma omp for schedule(static)
+            for (int i = k+1; i < n; i++){
+                l[i][k] = v[i][k]/u[k][k];
+                u[k][i] = v[k][i];
+            }
         }
-
-        //Loop can be parallelised constant time for each iteration for inner loop but variable time for outer loop
-        # pragma omp parallel for collapse(2)
+        
+        #pragma omp parallel for collapse(2)
         for (int i = k+1; i< n; i++){
             for(int j = k+1 ; j< n; j++){
                 v[i][j] = v[i][j] - (l[i][k] * u[k][j]);
             }
         }
+
     }
+
+    cout<<"out\n";
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start); 
-    cout<< "--" << duration.count() << endl; 
+    cout<< "Time taken by Openmp code for Lu-Decomposition: " << duration.count() << endl; 
 
-    // Converting p of size(n,1) to matrix of size (n,n) for calculation of PA
-    // MATRIX pp = generateRandom(n);
-    // for(int i = 0; i<n; i++){
-    //     for(int j = 0; j<n; j++){
-    //         if(p[i] == j+1){
-    //             pp[i][j] = 1;
-    //         }else{
-    //             pp[i][j] = 0;
-    //         }
-    //     }
-    // }
+    if(verify == 1){
+        double **pp = make2Dmatrix(n, true, false);
+        for(int i = 0; i<n; i++){
+            pp[i][p[i]-1] = 1;
+            
+        }
 
-    // cout<<l2norm(matmul(pp, a), matmul(l, u))<<endl;
-
+        double **pa = matmul(pp, a);
+        double **lu = matmul(l, u);
+        cout<<l2norm(matmul(pp, a), matmul(l, u))<<endl;
+    }
 
     return 0;
 }
