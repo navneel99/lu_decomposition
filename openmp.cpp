@@ -10,16 +10,17 @@ int n ;
 int n_thread;
 
 //Calculation of l2 norm given two matrices q1 and q2
-double l2norm(double **q1, double **q2){
+double l2norm(double** q1, double** q2){
     double ans = 0;
 
-    for(int i = 0; i < n; i++){
-        for (int j = 0; j < n ;j++){
-            ans = ans + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
-            
+    for(int j = 0; j < n; j++){
+        int sum = 0;
+        for (int i = 0; i < n ;i++){
+            sum = sum + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
         }
+        ans = ans + sqrt(sum);
     }
-    return sqrt(ans);
+    return ans;
 }
 
 //function that print an array
@@ -81,16 +82,14 @@ int main(int argc, char const *argv[]){
     
     n  = stoi(argv[1]);
     n_thread = stoi(argv[2]);
-    int verify = stoi(argv[3]);
-    int batch_size = ceil(n/n_thread);
-    
+    int verify = stoi(argv[3]);    
 
     double **v = make2Dmatrix(n, false, false);
     double **l = make2Dmatrix(n, true, true);
     double **u = make2Dmatrix(n, true, false);
     int *p = (int*)malloc(n*sizeof(int));
     
-    #pragma omp parallel for schedule(static, batch_size)
+    #pragma omp parallel for schedule(static)
     for(int i = 0; i<n; i++){
         p[i] = i+1;
     }
@@ -101,7 +100,7 @@ int main(int argc, char const *argv[]){
     omp_set_dynamic(0);
     omp_set_num_threads(n_thread);
 
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for schedule(static, 16) collapse(2)
     for(int i = 0; i<n; i++){
         for(int j = 0; j<n; j++){
             a[i][j] = v[i][j];
@@ -113,7 +112,7 @@ int main(int argc, char const *argv[]){
         double m = 0; 
         int ind = 0; 
 
-        #pragma omp parallel for shared(m, k, ind)
+        #pragma omp parallel for schedule(static, 16) shared(m, k, ind)
         for (int i = k;i<n;i++){
             if (m < abs(v[i][k])){
                 m = abs(v[i][k]);
@@ -139,22 +138,22 @@ int main(int argc, char const *argv[]){
 
         #pragma omp parallel shared(l, u, v, k)
         {
-            #pragma omp for schedule(static) nowait
+            #pragma omp for schedule(static, 16) nowait
             for ( int i = 0; i<=k-1;i++){
                 double tm = l[k][i];
                 l[k][i] = l[ind][i];
                 l[ind][i] = tm;
             }
-            #pragma omp for schedule(static)
+            #pragma omp for schedule(static, 16)
             for (int i = k+1; i < n; i++){
                 l[i][k] = v[i][k]/u[k][k];
                 u[k][i] = v[k][i];
             }
         }
         
-        #pragma omp parallel for collapse(2)
-        for (int i = k+1; i< n; i++){
-            for(int j = k+1 ; j< n; j++){
+        #pragma omp parallel for schedule(static, 16) collapse(2) 
+        for (int j = k+1; j< n; j++){
+            for(int i = k+1 ; i< n; i++){
                 v[i][j] = v[i][j] - (l[i][k] * u[k][j]);
             }
         }

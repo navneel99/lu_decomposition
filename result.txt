@@ -6,23 +6,34 @@ Compilation completed
 
 
 Execution of pthread code starting ...
-Time taken in microseconds: 6937
-Time taken in microseconds: 10040
-Time taken in microseconds: 24751
-Time taken in microseconds: 41171
-Time taken in microseconds: 66225
+Time taken in microseconds: 19293
+L2,1 norm: 0
+Time taken in microseconds: 16999
+L2,1 norm: 0
+Time taken in microseconds: 24672
+L2,1 norm: 0
+Time taken in microseconds: 41354
+L2,1 norm: 0
+Time taken in microseconds: 115045
+L2,1 norm: 0
 Execution of pthread code completed
 
 
 Execution of Openmp code starting ...
-Time taken by Openmp code for Lu-Decomposition: 1952
-Time taken by Openmp code for Lu-Decomposition: 1345
-Time taken by Openmp code for Lu-Decomposition: 1179
-Time taken by Openmp code for Lu-Decomposition: 35982
-Time taken by Openmp code for Lu-Decomposition: 51541
+Time taken by Openmp code for Lu-Decomposition: 7114
+0
+Time taken by Openmp code for Lu-Decomposition: 7028
+0
+Time taken by Openmp code for Lu-Decomposition: 10055
+0
+Time taken by Openmp code for Lu-Decomposition: 38477
+0
+Time taken by Openmp code for Lu-Decomposition: 81205
+0
 Execution of Openmp code completed
 
 
 Execution of Sequential code starting ...
-Time taken by Serial code for Lu-Decomposition: 1264
+Time taken by Serial code for Lu-Decomposition: 2233
+2.50135e-12
 Execution of Sequential code completed

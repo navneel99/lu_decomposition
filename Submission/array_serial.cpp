@@ -21,6 +21,7 @@ double l2norm(double** q1, double** q2){
     return ans;
 }
 
+
 //function that print an array
 void print_array(double **d, int n){
     for(int i = 0; i<n; i++){
