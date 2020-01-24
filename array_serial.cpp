@@ -1,13 +1,10 @@
 #include <bits/stdc++.h>
 #include <chrono> 
-#include <omp.h>
-#include <math.h>
 
 using namespace std::chrono; 
 using namespace std;
 
 int n ;
-int n_thread;
 
 //Calculation of l2 norm given two matrices q1 and q2
 double l2norm(double **q1, double **q2){
@@ -78,30 +75,19 @@ double **matmul(double **q1, double **q2){
 int main(int argc, char const *argv[]){
     srand(time(0));
     auto start = high_resolution_clock::now();
-    
     n  = stoi(argv[1]);
-    n_thread = stoi(argv[2]);
-    int verify = stoi(argv[3]);
-    int batch_size = ceil(n/n_thread);
-    
-
+    int verify = stoi(argv[2]);
     double **v = make2Dmatrix(n, false, false);
     double **l = make2Dmatrix(n, true, true);
     double **u = make2Dmatrix(n, true, false);
+
     int *p = (int*)malloc(n*sizeof(int));
-    
-    #pragma omp parallel for schedule(static, batch_size)
     for(int i = 0; i<n; i++){
         p[i] = i+1;
     }
 
+
     double **a = make2Dmatrix(n, false, false);
-
-    //Disabling the dynamic teams so that at run time number of threads is not changed
-    omp_set_dynamic(0);
-    omp_set_num_threads(n_thread);
-
-    #pragma omp parallel for collapse(2)
     for(int i = 0; i<n; i++){
         for(int j = 0; j<n; j++){
             a[i][j] = v[i][j];
@@ -113,13 +99,12 @@ int main(int argc, char const *argv[]){
         double m = 0; 
         int ind = 0; 
 
-        #pragma omp parallel for shared(m, k, ind)
         for (int i = k;i<n;i++){
             if (m < abs(v[i][k])){
                 m = abs(v[i][k]);
                 ind = i;
             }
-        }  
+        }
 
         if (m == 0){
             cerr <<"Singular Matrix!";
@@ -135,37 +120,30 @@ int main(int argc, char const *argv[]){
         v[ind] = v[k];
         v[k] = tem;
 
-        u[k][k] = v[k][k];
-
-        #pragma omp parallel shared(l, u, v, k)
-        {
-            #pragma omp for schedule(static) nowait
-            for ( int i = 0; i<=k-1;i++){
-                double tm = l[k][i];
-                l[k][i] = l[ind][i];
-                l[ind][i] = tm;
-            }
-            #pragma omp for schedule(static)
-            for (int i = k+1; i < n; i++){
-                l[i][k] = v[i][k]/u[k][k];
-                u[k][i] = v[k][i];
-            }
+        for ( int i = 0; i<=k-1;i++){
+            double tm = l[k][i];
+            l[k][i] = l[ind][i];
+            l[ind][i] = tm;
         }
         
-        #pragma omp parallel for collapse(2)
+        u[k][k] = v[k][k];
+
+        for (int i = k+1; i < n; i++){
+            l[i][k] = v[i][k]/u[k][k];
+            u[k][i] = v[k][i];
+        }
+
         for (int i = k+1; i< n; i++){
             for(int j = k+1 ; j< n; j++){
                 v[i][j] = v[i][j] - (l[i][k] * u[k][j]);
             }
         }
-
     }
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start); 
-    cout<< "Time taken by Openmp code for Lu-Decomposition: " << duration.count() << endl; 
+    cout<< "Time taken by Serial code for Lu-Decomposition: " << duration.count() << endl; 
 
-    //Verify is used in case we want to print the l2-norm value for PA-LU matrix.
     if(verify == 1){
         double **pp = make2Dmatrix(n, true, false);
         for(int i = 0; i<n; i++){

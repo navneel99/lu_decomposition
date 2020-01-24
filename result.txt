@@ -1,0 +1,28 @@
+Compiling all the codes ...
+g++ -o p.out -w -fpermissive pthreads.cpp -lpthread
+g++ -o s.out sequential.cpp 
+g++ -o op.out -fopenmp openmp.cpp
+Compilation completed
+
+
+Execution of pthread code starting ...
+Time taken in microseconds: 6937
+Time taken in microseconds: 10040
+Time taken in microseconds: 24751
+Time taken in microseconds: 41171
+Time taken in microseconds: 66225
+Execution of pthread code completed
+
+
+Execution of Openmp code starting ...
+Time taken by Openmp code for Lu-Decomposition: 1952
+Time taken by Openmp code for Lu-Decomposition: 1345
+Time taken by Openmp code for Lu-Decomposition: 1179
+Time taken by Openmp code for Lu-Decomposition: 35982
+Time taken by Openmp code for Lu-Decomposition: 51541
+Execution of Openmp code completed
+
+
+Execution of Sequential code starting ...
+Time taken by Serial code for Lu-Decomposition: 1264
+Execution of Sequential code completed
