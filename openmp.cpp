@@ -2,6 +2,7 @@
 #include <chrono> 
 #include <omp.h>
 #include <math.h>
+#include <fstream>
 
 using namespace std::chrono; 
 using namespace std;
@@ -14,10 +15,12 @@ double l2norm(double** q1, double** q2){
     double ans = 0;
 
     for(int j = 0; j < n; j++){
-        int sum = 0;
+        double sum = 0;
         for (int i = 0; i < n ;i++){
             sum = sum + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
+            // cout<<q1[i][j]<<"-"<<q2[i][j]<<" ";
         }
+        // cout<<"\n";
         ans = ans + sqrt(sum);
     }
     return ans;
@@ -61,6 +64,39 @@ double **make2Dmatrix(int n, bool init, bool isl){
     return m;
 }
 
+double **Get2Dmatrix(int n, bool init, bool isl, string name){
+    ifstream myfile;
+    myfile.open(name);
+
+    int i;
+    double **m;
+    m = (double**)malloc(n*sizeof(double*));
+    for(i = 0; i<n; i++){
+        m[i] = (double*)malloc(n*sizeof(double));
+    }
+    if(init){
+        for(int i = 0; i<n; i++){
+            for(int j = 0; j<n; j++){
+                if(isl && i == j){
+                    m[i][j] = 1;
+                }else{
+                    m[i][j] = 0;
+                }
+            }
+        }
+    }else{
+        for(int i = 0; i<n; i++){
+            for(int j = 0; j<n; j++){
+                double a;
+                myfile>>a;
+                m[i][j] = a;
+            }
+        }
+    }
+    myfile.close();
+    return m;
+}
+
 //Matrix multiplication of two matrices q1 and q2
 double **matmul(double **q1, double **q2){
    double **m = make2Dmatrix(n, false, false);
@@ -76,31 +112,41 @@ double **matmul(double **q1, double **q2){
     return m;
 }
 
+void PrintMatrix(double **a, int n, string name){
+    ofstream myfile;
+    myfile.open(name);
+    for(int i = 0; i<n; i++){
+        for(int j = 0; j<n; j++){
+            myfile<<a[i][j]<<" ";
+        }
+        myfile<<"\n";
+    }
+    myfile.close();
+}
+
 int main(int argc, char const *argv[]){
     srand(time(0));
     auto start = high_resolution_clock::now();
     
     n  = stoi(argv[1]);
     n_thread = stoi(argv[2]);
-    int verify = stoi(argv[3]);    
+    int verify = stoi(argv[3]);
+    int batch_size = ceil(n/n_thread);
+    
 
-    double **v = make2Dmatrix(n, false, false);
+    double **v = Get2Dmatrix(n, false, false, "A_1000.txt");
+    // double **v = make2Dmatrix(n, false, false);
     double **l = make2Dmatrix(n, true, true);
     double **u = make2Dmatrix(n, true, false);
     int *p = (int*)malloc(n*sizeof(int));
-    
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static, batch_size)
     for(int i = 0; i<n; i++){
-        p[i] = i+1;
+        p[i] = i;
     }
 
     double **a = make2Dmatrix(n, false, false);
 
-    //Disabling the dynamic teams so that at run time number of threads is not changed
-    omp_set_dynamic(0);
-    omp_set_num_threads(n_thread);
-
-    #pragma omp parallel for schedule(static, 16) collapse(2)
+    #pragma omp parallel for collapse(2)
     for(int i = 0; i<n; i++){
         for(int j = 0; j<n; j++){
             a[i][j] = v[i][j];
@@ -112,7 +158,7 @@ int main(int argc, char const *argv[]){
         double m = 0; 
         int ind = 0; 
 
-        #pragma omp parallel for schedule(static, 16) shared(m, k, ind)
+        #pragma omp parallel for shared(m, k, ind)
         for (int i = k;i<n;i++){
             if (m < abs(v[i][k])){
                 m = abs(v[i][k]);
@@ -121,7 +167,7 @@ int main(int argc, char const *argv[]){
         }  
 
         if (m == 0){
-            cerr <<"Singular Matrix!";
+            cerr <<"Singular Matrix!"<<endl;
             break;
         }
 
@@ -134,30 +180,30 @@ int main(int argc, char const *argv[]){
         v[ind] = v[k];
         v[k] = tem;
 
-        u[k][k] = v[k][k];
+        
 
         #pragma omp parallel shared(l, u, v, k)
         {
-            #pragma omp for schedule(static, 16) nowait
+            #pragma omp  for schedule(static)
             for ( int i = 0; i<=k-1;i++){
                 double tm = l[k][i];
                 l[k][i] = l[ind][i];
                 l[ind][i] = tm;
             }
-            #pragma omp for schedule(static, 16)
+            u[k][k] = v[k][k];
+            #pragma omp for schedule(static)
             for (int i = k+1; i < n; i++){
-                l[i][k] = v[i][k]/u[k][k];
+                l[i][k] = v[i][k]/double(u[k][k]);
                 u[k][i] = v[k][i];
             }
         }
         
-        #pragma omp parallel for schedule(static, 16) collapse(2) 
-        for (int j = k+1; j< n; j++){
-            for(int i = k+1 ; i< n; i++){
+        #pragma omp parallel for collapse(2)
+        for (int i = k+1; i< n; i++){
+            for(int j = k+1; j< n; j++){
                 v[i][j] = v[i][j] - (l[i][k] * u[k][j]);
             }
         }
-
     }
 
     auto stop = high_resolution_clock::now();
@@ -166,15 +212,27 @@ int main(int argc, char const *argv[]){
 
     //Verify is used in case we want to print the l2-norm value for PA-LU matrix.
     if(verify == 1){
+
+        for (int i = 0; i<100;i++ ){
+            cout<<p[i]<<" ";
+        }
+        cout<<"\n";
+
         double **pp = make2Dmatrix(n, true, false);
         for(int i = 0; i<n; i++){
-            pp[i][p[i]-1] = 1;
+            pp[i][p[i]] = 1;
             
         }
 
         double **pa = matmul(pp, a);
         double **lu = matmul(l, u);
-        cout<<l2norm(matmul(pp, a), matmul(l, u))<<endl;
+        cout<<l2norm(pa, lu)<<endl;
+        // print_array(u, n);
+        PrintMatrix(pa, n, "PA.txt");
+        PrintMatrix(lu, n, "LU.txt");
+        PrintMatrix(l, n, "Lowerop.txt");
+        PrintMatrix(u, n, "Upperop.txt");
+        PrintMatrix(pp, n, "Permutationop.txt");
     }
 
     return 0;

@@ -21,6 +21,7 @@ double l2norm(double** q1, double** q2){
     return ans;
 }
 
+
 //function that print an array
 void print_array(double **d, int n){
     for(int i = 0; i<n; i++){
@@ -74,6 +75,52 @@ double **matmul(double **q1, double **q2){
     return m;
 }
 
+void PrintMatrix(double **a, int n, string name){
+    ofstream myfile;
+    myfile.open(name);
+    for(int i = 0; i<n; i++){
+        for(int j = 0; j<n; j++){
+            myfile<<a[i][j]<<" ";
+        }
+        myfile<<"\n";
+    }
+    myfile.close();
+}
+
+double **Get2Dmatrix(int n, bool init, bool isl, string name){
+    ifstream myfile;
+    myfile.open(name);
+
+    int i;
+    double **m;
+    m = (double**)malloc(n*sizeof(double*));
+    for(i = 0; i<n; i++){
+        m[i] = (double*)malloc(n*sizeof(double));
+    }
+    if(init){
+        for(int i = 0; i<n; i++){
+            for(int j = 0; j<n; j++){
+                if(isl && i == j){
+                    m[i][j] = 1;
+                }else{
+                    m[i][j] = 0;
+                }
+            }
+        }
+    }else{
+        for(int i = 0; i<n; i++){
+            for(int j = 0; j<n; j++){
+                double a;
+                myfile>>a;
+                m[i][j] = a;
+            }
+        }
+    }
+    myfile.close();
+    return m;
+}
+
+
 int main(int argc, char const *argv[]){
     srand(time(0));
     auto start = high_resolution_clock::now();
@@ -89,7 +136,8 @@ int main(int argc, char const *argv[]){
     }
 
 
-    double **a = make2Dmatrix(n, false, false);
+    // double **a = make2Dmatrix(n, false, false);
+    double **a = Get2Dmatrix(n, false, false, "B_100.txt");
     for(int i = 0; i<n; i++){
         for(int j = 0; j<n; j++){
             a[i][j] = v[i][j];
@@ -156,6 +204,9 @@ int main(int argc, char const *argv[]){
         double **pa = matmul(pp, a);
         double **lu = matmul(l, u);
         cout<<l2norm(matmul(pp, a), matmul(l, u))<<endl;
+        PrintMatrix(matmul(l,u), n, "Lowerop.txt");
+        PrintMatrix(u, n, "Upperop.txt");
+        PrintMatrix(pp, n, "Permutationop.txt");
     }
 
     return 0;

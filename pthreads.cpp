@@ -30,6 +30,7 @@ int *p;
 //Variable to return the L2 Norm as specified by the user
 bool v = false;
 
+string name = "A_1000.txt";
 
 //Helper Function, to help in debugging
 void print_vector(double** v ){
@@ -45,7 +46,7 @@ double l2norm(double** q1, double** q2){
     double ans = 0;
 
     for(int j = 0; j < n; j++){
-        int sum = 0;
+        double sum = 0;
         for (int i = 0; i < n ;i++){
             sum = sum + (q1[i][j] - q2[i][j])*(q1[i][j] - q2[i][j]);
 
@@ -73,6 +74,19 @@ double **matmul(double **q1, double **q2){
     }
     return m;
 }
+void PrintMatrix(double **a, int n, string name){
+    ofstream myfile;
+    myfile.open(name);
+    for(int i = 0; i<n; i++){
+        for(int j = 0; j<n; j++){
+            myfile<<a[i][j]<<" ";
+        }
+        myfile<<"\n";
+    }
+    myfile.close();
+}
+
+
 
 //Function to generate and fill random numbers in the matrix per thread.
 void* generateRandom(void* arg){
@@ -118,6 +132,57 @@ void* generateRandom(void* arg){
     return NULL;
 }
 
+
+void* GetMatrix(void* arg){
+    string name = "A_1000.txt";
+    fstream myfile;
+    myfile.open(name);
+    //returns the thread_id (from 0 to NUM_THREADS-1) 
+    int jk = (int) arg;
+    //returns the starting and the ending row indices to fill by this thread.
+    int st = (int)(jk * n/NUM_THREADS);
+    int end = (int)((jk+1) *n/NUM_THREADS);
+    //Gives the reentrant seed particularly for this thread by munging the system clock with the thread_id
+    unsigned seed = system_clock::now().time_since_epoch().count() + (rand()%(NUM_THREADS+jk));
+    mt19937 generator(seed);
+    for (int i = st; i<end;i++){
+      for(int j = 0; j < n; j++){
+
+        // double tmp = (1 + ( (((float)generator())/generator.max()) * 100));
+        double tmp;
+        myfile>>tmp;
+        a[i][j] = tmp;
+        l[i][j] = 0;
+        u[i][j] = 0;
+        if (v){
+            pp[i][j] = 0;
+            aa[i][j] = tmp;
+        }
+      }
+      p[i] = 0;
+    }
+    if (jk == NUM_THREADS - 1){
+        for (int i =0; i < n%NUM_THREADS;i++){
+          for(int j = 0; j<n;j++){
+            // double tmp = (1 + ( (((float)generator())/generator.max()) * 100));
+            double tmp;
+            myfile>>tmp;
+
+            a[i][j] = tmp;
+            l[i][j] = 0;
+            u[i][j] = 0;
+            if (v){
+                aa[i][j] = tmp;
+                pp[i][j] = 0;
+            }
+          }
+          p[i] = 0;
+        }
+    }
+    pthread_exit(NULL);
+    return NULL;
+}
+
 //Initializes the L and p matrices by adding 1 at the diagonal in L and i in p
 void * matrixInit(void* r){
     int q = (int) r;
@@ -145,12 +210,12 @@ void* firstSwap(void* r){
     int st = k+1 + (q*(n-k-1)/NUM_THREADS);
     int end = k+1 + (q+1)*(n-k-1)/NUM_THREADS;
     for (int i =st; i<end; i++){
-        l[i][k] = a[i][k]/float(u[k][k]);
+        l[i][k] = a[i][k]/double(u[k][k]);
         u[k][i] = a[k][i];
     }
     if (q == NUM_THREADS- 1){
         for(int i  = end; i <n;i++){
-            l[i][k] = a[i][k]/float(u[k][k]);
+            l[i][k] = a[i][k]/double(u[k][k]);
             u[k][i] = a[k][i];
         }
     }
@@ -225,10 +290,13 @@ int main(int argc, char ** argv){
     auto start = high_resolution_clock::now();
     //Seed for inside the random number generator
     srand(time(0));
-
+    
     for ( int i = 0; i < NUM_THREADS; i++){
         int ti = pthread_create(&threads[i],NULL,generateRandom,(void *)i);
+        // int ti = 
     }
+    
+
     for(int i =0; i< NUM_THREADS;i++){
         int a = pthread_join(threads[i],NULL);
     }
@@ -242,7 +310,18 @@ int main(int argc, char ** argv){
     }
 
 
+    ifstream myfile;
+    myfile.open(name);
+    double ma;
+    for (int i = 0; i<n;i++){
+        for(int j=0; j<n;j++){
+            myfile >> ma;
+            a[i][j] = ma;
+            aa[i][j] = ma;
+        }
+    }
 
+    PrintMatrix(a,100,"p.txt");
 
     //For each column number
     for (int  k = 0; k < n; k++){
@@ -305,11 +384,18 @@ int main(int argc, char ** argv){
     auto duration = duration_cast<microseconds>(stop - start);
     cout <<"Time taken in microseconds: "<< duration.count() << endl;
     if (v){
+        for (int i = 0; i<100;i++ ){
+            cout<<p[i]<<" ";
+        }
+        cout<<"\n";
         //This code executes only if v is true
         for(int i = 0; i<n; i++){
             pp[i][p[i]] = 1;        
         }
         cout<<"L2,1 norm: "<<l2norm(matmul(pp, aa), matmul(l, u))<<endl;
+        PrintMatrix(l, n, "Lower.txt");
+        PrintMatrix(u, n, "Upper.txt");
+        PrintMatrix(pp, n, "Permutation.txt");
     }
 
     return 0;
